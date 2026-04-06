@@ -69,7 +69,7 @@ const ControlPanel = ({ params, onChange, onReset }: ControlPanelProps) => {
       ref={panelRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="fixed bottom-6 right-6 z-50 glass-panel p-5 w-72 opacity-0"
+      className="fixed bottom-6 right-6 z-50 p-5 w-72 opacity-0 bg-card/90 border border-border/50 rounded-xl"
       style={{ pointerEvents: visible ? "auto" : "none" }}
     >
       <div className="flex items-center justify-between mb-5">

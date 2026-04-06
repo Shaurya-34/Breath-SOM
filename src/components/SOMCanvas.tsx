@@ -130,7 +130,9 @@ const SOMCanvas = ({ params, resetKey }: SOMCanvasProps) => {
         }
       }
 
-      // Draw nodes with glow
+      // Draw nodes with soft glow via single shadow pass
+      const radius = 2.5 * devicePixelRatio;
+      ctx.shadowBlur = 8 * devicePixelRatio;
       for (let y = 0; y < gh; y++) {
         for (let x = 0; x < gw; x++) {
           const idx = y * gw + x;
@@ -138,22 +140,16 @@ const SOMCanvas = ({ params, resetKey }: SOMCanvasProps) => {
           const px = ox + margin + node.weights[0] * innerDim * 0.3 + x * cellW * 0.7;
           const py = oy + margin + node.weights[1] * innerDim * 0.3 + y * cellH * 0.7;
           const [r, g, b] = weightToColor(node.weights);
-          const radius = 2.5 * devicePixelRatio;
 
-          // Soft glow
-          const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius * 4);
-          gradient.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
-          gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
-          ctx.fillStyle = gradient;
-          ctx.fillRect(px - radius * 4, py - radius * 4, radius * 8, radius * 8);
-
-          // Core dot
+          ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
           ctx.fillStyle = `rgb(${r},${g},${b})`;
           ctx.beginPath();
           ctx.arc(px, py, radius, 0, Math.PI * 2);
           ctx.fill();
         }
       }
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "transparent";
 
       animRef.current = requestAnimationFrame(render);
     };
