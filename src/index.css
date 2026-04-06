@@ -5,13 +5,13 @@
 @layer base {
   :root {
     --background: 0 0% 4%;
-    --foreground: 0 0% 85%;
+    --foreground: 0 0% 95%;
 
     --card: 0 0% 7%;
-    --card-foreground: 0 0% 85%;
+    --card-foreground: 0 0% 92%;
 
     --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 85%;
+    --popover-foreground: 0 0% 92%;
 
     --primary: 200 60% 50%;
     --primary-foreground: 0 0% 4%;
@@ -20,7 +20,7 @@
     --secondary-foreground: 0 0% 70%;
 
     --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 65%;
 
     --accent: 160 40% 45%;
     --accent-foreground: 0 0% 95%;
@@ -68,7 +68,7 @@
   }
 
   .control-label {
-    @apply text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium;
+    @apply text-[10px] uppercase tracking-[0.15em] text-foreground/70 font-medium;
   }
 
   .glow-subtle {
