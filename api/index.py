@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from som_core import SelfOrganizingMap
+from api.som_core import SelfOrganizingMap
 
 # ---------------------------------------------------------------------------
 # App setup
