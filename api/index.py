@@ -105,7 +105,7 @@ app.add_middleware(
 
 GRID_SIZE = 20
 INPUT_DIM = 3
-DATA_SIZE = 100
+DATA_SIZE = 20
 
 _lock = threading.Lock()
 
