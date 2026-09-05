@@ -4,11 +4,12 @@ FastAPI server for Breath SOM – serves training state to the nebula-hue fronte
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from typing import List
 
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 
 class SelfOrganizingMap:
-    def __init__(self, input_dim, grid_size, learning_rate=0.1, radius=None, epochs=100):
+    def __init__(self, input_dim, grid_size, learning_rate=0.1, radius=None, epochs=100, dataset_type="uniform"):
         self.input_dim = input_dim
         self.grid_size = grid_size
         self.initial_lr = learning_rate
@@ -25,9 +26,36 @@ class SelfOrganizingMap:
         self.epochs = epochs
         self.initial_radius = radius if radius else max(grid_size) / 2
         self.radius = self.initial_radius
+        self.dataset_type = dataset_type
 
         self.grid_i, self.grid_j = np.indices((grid_size[0], grid_size[1]))
         self.weights = np.random.rand(grid_size[0], grid_size[1], input_dim)
+
+    def sample_data(self):
+        if self.dataset_type == "sphere":
+            vec = np.random.normal(0, 1, self.input_dim)
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec = vec / norm
+            return 0.5 + 0.45 * vec
+        elif self.dataset_type == "ring":
+            theta = np.random.uniform(0, 2 * np.pi)
+            r = 0.4 + np.random.uniform(-0.05, 0.05)
+            x = 0.5 + r * np.cos(theta)
+            y = 0.5 + r * np.sin(theta)
+            z = np.random.uniform(0.2, 0.8)
+            return np.array([x, y, z])
+        elif self.dataset_type == "clusters":
+            centers = np.array([
+                [0.2, 0.2, 0.8],
+                [0.8, 0.2, 0.2],
+                [0.2, 0.8, 0.2],
+                [0.8, 0.8, 0.8]
+            ])
+            c = centers[np.random.choice(len(centers))]
+            return np.clip(c + np.random.normal(0, 0.08, self.input_dim), 0, 1)
+        else:
+            return np.random.rand(self.input_dim)
 
     def find_bmu(self, sample):
         distances = np.linalg.norm(self.weights - sample, axis=2)
@@ -40,7 +68,7 @@ class SelfOrganizingMap:
         self.weights += self.learning_rate * influence * (sample - self.weights)
 
     def step(self, iteration: int, total_iterations: int):
-        sample = np.random.rand(self.input_dim)
+        sample = self.sample_data()
         decay = np.exp(-iteration / total_iterations)
         self.learning_rate = self.initial_lr * decay
         self.radius = self.initial_radius * decay
@@ -49,26 +77,6 @@ class SelfOrganizingMap:
         self.update_weights(sample, bmu)
         delta = np.linalg.norm(self.weights - prev, axis=2)
         return bmu, delta
-
-    def train(self, data, epochs=None):
-        if epochs is None:
-            epochs = self.epochs
-        total_iterations = epochs * len(data)
-        iteration = 0
-        frames = []
-
-        for epoch in range(epochs):
-            np.random.shuffle(data)
-            for sample in data:
-                decay = np.exp(-iteration / total_iterations)
-                self.learning_rate = self.initial_lr * decay
-                self.radius = self.initial_radius * decay
-                bmu = self.find_bmu(sample)
-                self.update_weights(sample, bmu)
-                iteration += 1
-            frames.append(self.weights.copy())
-
-        return frames
 
     def get_weights_flat(self):
         h, w, _ = self.weights.shape
@@ -106,6 +114,7 @@ class TrainParams(BaseModel):
     neighborhood_radius: float = Field(5.0, ge=0.5, le=15.0)
     epochs: int = Field(100, ge=1, le=500)
     grid_size: int = Field(20, ge=5, le=40)
+    dataset_type: str = Field("uniform")
 
 _params = TrainParams()
 _som = SelfOrganizingMap(
@@ -114,6 +123,7 @@ _som = SelfOrganizingMap(
     learning_rate=_params.learning_rate,
     radius=_params.neighborhood_radius,
     epochs=_params.epochs,
+    dataset_type=_params.dataset_type,
 )
 _iteration = 0
 _total_iterations = _params.epochs * DATA_SIZE
@@ -126,6 +136,7 @@ def _make_som():
         learning_rate=_params.learning_rate,
         radius=_params.neighborhood_radius,
         epochs=_params.epochs,
+        dataset_type=_params.dataset_type,
     )
 
 @app.get("/api/params", response_model=TrainParams)
@@ -197,6 +208,29 @@ def get_stats():
             "initial_lr":      _params.learning_rate,
             "initial_radius":  _params.neighborhood_radius,
             "grid_size":       _params.grid_size,
+            "dataset_type":    _params.dataset_type,
             "input_dim":       INPUT_DIM,
             "data_size":       DATA_SIZE,
         }
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    global _iteration
+    try:
+        while True:
+            await asyncio.sleep(0.05)
+            with _lock:
+                bmu, delta = _som.step(_iteration, max(_total_iterations, 1))
+                _iteration += 1
+                payload = {
+                    "iteration": _iteration,
+                    "nodes": _som.get_weights_flat(),
+                    "bmu": [int(bmu[0]), int(bmu[1])],
+                    "delta": delta.ravel().tolist() if delta is not None else [],
+                }
+            await websocket.send_json(payload)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        await websocket.close()

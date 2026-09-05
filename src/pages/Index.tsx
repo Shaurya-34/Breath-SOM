@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import SOMCanvas from "@/components/SOMCanvas";
 import ControlPanel from "@/components/ControlPanel";
 import MathPanel from "@/components/MathPanel";
-import { SOMParams } from "@/lib/som";
+import { SOMParams, SOMNode } from "@/lib/som";
 
 const DEFAULT_PARAMS: SOMParams = {
   learningRate: 0.1,
@@ -11,20 +11,28 @@ const DEFAULT_PARAMS: SOMParams = {
   epochs: 100,
   gridSize: 20,
   zScale: 1.0,
+  datasetType: "uniform",
 };
 
 const Index = () => {
   const [params, setParams] = useState<SOMParams>(DEFAULT_PARAMS);
   const [resetKey, setResetKey] = useState(0);
+  const [nodes, setNodes] = useState<SOMNode[]>([]);
+  const [iteration, setIteration] = useState(0);
 
   const handleReset = useCallback(() => {
     setResetKey((k) => k + 1);
     setParams(DEFAULT_PARAMS);
   }, []);
 
+  const handleNodesUpdate = useCallback((currentNodes: SOMNode[], currentIter: number) => {
+    setNodes(currentNodes);
+    setIteration(currentIter);
+  }, []);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden" style={{ background: "radial-gradient(circle at 50% 50%, #0d1222 0%, #020205 100%)" }}>
-      <SOMCanvas params={params} resetKey={resetKey} />
+      <SOMCanvas params={params} resetKey={resetKey} onNodesUpdate={handleNodesUpdate} />
 
       {/* Title watermark */}
       <div className="fixed top-6 left-6 z-40 pointer-events-none">
@@ -37,7 +45,13 @@ const Index = () => {
       </div>
 
       <MathPanel />
-      <ControlPanel params={params} onChange={setParams} onReset={handleReset} />
+      <ControlPanel
+        params={params}
+        nodes={nodes}
+        iteration={iteration}
+        onChange={setParams}
+        onReset={handleReset}
+      />
     </div>
   );
 };

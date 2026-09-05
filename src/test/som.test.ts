@@ -69,6 +69,7 @@ describe('som lib', () => {
       animationSpeed: 1.5,
       epochs: 80,
       gridSize: 15,
+      datasetType: 'sphere',
     };
 
     await remoteSetParams(params);
@@ -81,6 +82,7 @@ describe('som lib', () => {
         neighborhood_radius: 2.5,
         epochs: 80,
         grid_size: 15,
+        dataset_type: 'sphere',
       }),
     });
   });

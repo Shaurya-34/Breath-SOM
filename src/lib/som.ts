@@ -1,4 +1,4 @@
-// som.ts – remote-only helpers (Python backend)
+// som.ts – remote-only helpers & streaming (Python backend)
 export interface SOMParams {
   learningRate: number;
   neighborhoodRadius: number;
@@ -6,6 +6,7 @@ export interface SOMParams {
   epochs?: number;
   gridSize?: number;
   zScale?: number;        // visual amplification of real ‖Δw‖ z-displacement
+  datasetType?: "uniform" | "sphere" | "ring" | "clusters";
 }
 
 export interface SOMNode {
@@ -53,6 +54,54 @@ export async function remoteSetParams(p: SOMParams): Promise<void> {
       neighborhood_radius:  p.neighborhoodRadius,
       epochs:               p.epochs ?? 100,
       grid_size:            p.gridSize ?? 20,
+      dataset_type:         p.datasetType ?? "uniform",
     }),
   });
+}
+
+export function connectSOMWebSocket(onMessage: (data: RemoteStepResult) => void): () => void {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const nodes: SOMNode[] = (data.nodes as Array<{ x: number; y: number; weights: number[] }>).map((nd, i) => ({
+        ...nd,
+        delta: data.delta?.[i] ?? 0,
+      }));
+      onMessage({
+        iteration: data.iteration,
+        nodes,
+        bmu: data.bmu ?? [0, 0],
+        delta: data.delta ?? [],
+      });
+    } catch {
+      // ignore parse errors
+    }
+  };
+
+  return () => {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close();
+    }
+  };
+}
+
+export function downloadSOMExport(nodes: SOMNode[], params: SOMParams, iteration: number) {
+  const exportData = {
+    timestamp: new Date().toISOString(),
+    iteration,
+    params,
+    nodesCount: nodes.length,
+    nodes,
+  };
+  const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(exportData, null, 2))}`;
+  const downloadAnchor = document.createElement("a");
+  downloadAnchor.setAttribute("href", jsonString);
+  downloadAnchor.setAttribute("download", `som-export-iter-${iteration}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
 }

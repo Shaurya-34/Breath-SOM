@@ -1,17 +1,19 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import anime from "animejs";
-import { SOMParams } from "@/lib/som";
+import { SOMParams, SOMNode, downloadSOMExport } from "@/lib/som";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Download } from "lucide-react";
 
 interface ControlPanelProps {
   params: SOMParams;
+  nodes?: SOMNode[];
+  iteration?: number;
   onChange: (params: SOMParams) => void;
   onReset: () => void;
 }
 
-const ControlPanel = ({ params, onChange, onReset }: ControlPanelProps) => {
+const ControlPanel = ({ params, nodes = [], iteration = 0, onChange, onReset }: ControlPanelProps) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -42,16 +44,20 @@ const ControlPanel = ({ params, onChange, onReset }: ControlPanelProps) => {
   }, [visible]);
 
   const update = useCallback(
-    (key: keyof SOMParams, value: number) => onChange({ ...params, [key]: value }),
+    (key: keyof SOMParams, value: any) => onChange({ ...params, [key]: value }),
     [params, onChange]
   );
+
+  const handleExport = useCallback(() => {
+    downloadSOMExport(nodes, params, iteration);
+  }, [nodes, params, iteration]);
 
   return (
     <div
       ref={panelRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="fixed bottom-6 right-6 z-50 p-6 w-80 opacity-0 glass-panel flex flex-col transition-all duration-400 ease-out"
+      className="fixed bottom-6 right-6 z-50 p-6 w-80 opacity-0 glass-panel flex flex-col transition-all duration-400 ease-out max-h-[85vh] overflow-y-auto"
       style={{ pointerEvents: visible ? "auto" : "none" }}
     >
       {/* Header */}
@@ -60,6 +66,21 @@ const ControlPanel = ({ params, onChange, onReset }: ControlPanelProps) => {
         <span className="control-label animate-breathe">Press C to toggle</span>
       </div>
       <div className="space-y-5">
+        {/* Dataset Preset Selection */}
+        <div className="space-y-2">
+          <span className="control-label">Dataset Topology</span>
+          <select
+            value={params.datasetType ?? "uniform"}
+            onChange={(e) => update("datasetType", e.target.value)}
+            className="w-full bg-background/50 border border-border/50 rounded-md p-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          >
+            <option value="uniform">Uniform RGB Cube</option>
+            <option value="sphere">Spherical Field</option>
+            <option value="ring">Torus / Ring</option>
+            <option value="clusters">Gaussian Clusters</option>
+          </select>
+        </div>
+
         {/* Grid Size — resizes + resets the SOM */}
         <div className="space-y-2">
           <div className="flex justify-between items-baseline">
@@ -121,10 +142,16 @@ const ControlPanel = ({ params, onChange, onReset }: ControlPanelProps) => {
           </div>
         </div>
 
-        <Button variant="outline" size="sm" onClick={onReset}
-          className="w-full mt-2 text-xs border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300">
-          <RotateCcw className="w-3 h-3 mr-2"/>Reset
-        </Button>
+        <div className="flex gap-2 mt-2">
+          <Button variant="outline" size="sm" onClick={onReset}
+            className="flex-1 text-xs border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300">
+            <RotateCcw className="w-3 h-3 mr-2"/>Reset
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}
+            className="flex-1 text-xs border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300">
+            <Download className="w-3 h-3 mr-2"/>Export
+          </Button>
+        </div>
       </div>
     </div>
   );

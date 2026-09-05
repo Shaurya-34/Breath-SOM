@@ -16,6 +16,12 @@ def test_som_logic():
     assert len(flat) == 100
     assert "x" in flat[0] and "y" in flat[0] and "weights" in flat[0]
 
+def test_som_datasets():
+    for ds in ["uniform", "sphere", "ring", "clusters"]:
+        som = SelfOrganizingMap(input_dim=3, grid_size=(5, 5), dataset_type=ds)
+        sample = som.sample_data()
+        assert len(sample) == 3
+
 def test_api_params_endpoint():
     res = client.get("/api/params")
     assert res.status_code == 200
@@ -27,12 +33,13 @@ def test_api_params_endpoint():
         "learning_rate": 0.2,
         "neighborhood_radius": 4.0,
         "epochs": 50,
-        "grid_size": 15
+        "grid_size": 15,
+        "dataset_type": "sphere"
     }
     res_post = client.post("/api/params", json=new_params)
     assert res_post.status_code == 200
     assert res_post.json()["learning_rate"] == 0.2
-    assert res_post.json()["grid_size"] == 15
+    assert res_post.json()["dataset_type"] == "sphere"
 
 def test_api_step_and_stats():
     res_step = client.post("/api/step", json={"n": 2})
@@ -48,7 +55,14 @@ def test_api_step_and_stats():
     stats_data = res_stats.json()
     assert stats_data["iteration"] >= 2
     assert "progress" in stats_data
-    assert "learning_rate" in stats_data
+    assert "dataset_type" in stats_data
+
+def test_api_websocket():
+    with client.websocket_connect("/ws") as websocket:
+        data = websocket.receive_json()
+        assert "iteration" in data
+        assert "nodes" in data
+        assert "bmu" in data
 
 def test_api_reset():
     res_reset = client.post("/api/reset")
